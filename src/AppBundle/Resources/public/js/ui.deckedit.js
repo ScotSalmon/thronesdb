@@ -21,7 +21,7 @@ ui.read_config_from_storage = function read_config_from_storage() {
 		'show-unusable': false,
 		'show-only-deck': false,
 		'display-column': 1,
-		'core-set': 1,
+		'core-set': 3,
 		'show-suggestions': 0,
 		'buttons-behavior': 'cumulative'
 	}, Config || {});
@@ -69,7 +69,7 @@ ui.remove_melee_titles = function remove_melee_titles() {
 ui.set_max_qty = function set_max_qty() {
 	app.data.cards.find().forEach(function(record) {
 		var max_qty = Math.min(3, record.deck_limit);
-		if (record.pack_code == 'core')
+		if (record.pack_code == 'Core')
 			max_qty = Math.min(max_qty, record.quantity * Config['core-set']);
 		app.data.cards.updateById(record.code, {
 			maxqty : max_qty
@@ -126,6 +126,11 @@ ui.build_pack_selector = function build_pack_selector() {
 		name: {
 			'$exists': true
 		}
+	}, {
+	    $orderBy: {
+	        cycle_position: 1,
+	        position: 1
+	    }
 	}).forEach(function(record) {
 		// checked or unchecked ? checked by default
 		var checked = true;
@@ -613,6 +618,16 @@ ui.init_filter_help = function init_filter_help() {
 	});
 }
 
+ui.setup_dataupdate = function setup_dataupdate() {
+	$('a.data-update').click(function (event) {
+		$(document).on('data.app', function (event) {
+			$('a.data-update').parent().text("Data refreshed. You can save or reload your deck.");
+		});
+		app.data.update();
+		return false;
+	})
+}
+
 /**
  * called when the DOM is loaded
  * @memberOf ui
@@ -652,6 +667,7 @@ ui.on_all_loaded = function on_all_loaded() {
 	ui.refresh_deck();
 	ui.refresh_list();
 	ui.setup_typeahead();
+	ui.setup_dataupdate();
 	app.deck_history && app.deck_history.setup('#history');
 };
 

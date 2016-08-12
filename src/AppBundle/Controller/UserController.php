@@ -5,7 +5,6 @@ namespace AppBundle\Controller;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 class UserController extends Controller
 {
@@ -44,11 +43,11 @@ class UserController extends Controller
         ));
     }
 
-    public function saveProfileAction()
+    public function saveProfileAction(Request $request)
     {
     	/* @var $user \AppBundle\Entity\User */
     	$user = $this->getUser();
-    	$request = $this->getRequest();
+    	$request = $request;
     	$em = $this->getDoctrine()->getManager();
 
     	$username = filter_var($request->get('username'), FILTER_SANITIZE_STRING);

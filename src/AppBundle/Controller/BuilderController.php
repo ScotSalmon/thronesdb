@@ -12,9 +12,6 @@ use AppBundle\Entity\Card;
 use Doctrine\ORM\EntityManager;
 use Symfony\Component\HttpFoundation\Request;
 use AppBundle\Entity\Deckchange;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class BuilderController extends Controller
 {
@@ -28,7 +25,7 @@ class BuilderController extends Controller
 		/* @var $em \Doctrine\ORM\EntityManager */
 		$em = $this->getDoctrine()->getManager();
 
-		$factions = $em->getRepository('AppBundle:Faction')->findBy(["is_primary" => TRUE]);
+		$factions = $em->getRepository('AppBundle:Faction')->findBy(["isPrimary" => TRUE]);
 		$agenda = $em->getRepository('AppBundle:Type')->findOneBy(['code' => 'agenda']);
 		$agendas = $em->getRepository('AppBundle:Card')->findBy(['type' => $agenda]);
 
@@ -65,7 +62,7 @@ class BuilderController extends Controller
         {
         	$agenda = NULL;
         	$name = sprintf("New deck: %s", $faction->getName());
-        	$pack = $em->getRepository('AppBundle:Pack')->findOneBy(array("code" => "core"));
+        	$pack = $em->getRepository('AppBundle:Pack')->findOneBy(array("code" => "Core"));
         }
         else
         {
@@ -199,11 +196,11 @@ class BuilderController extends Controller
 
         $crawler = new Crawler();
         $crawler->addXmlContent($octgn);
-		// read octgnid
+		// read octgnId
         $cardcrawler = $crawler->filter('deck > section > card');
-		$octgnids = [];
+		$octgnIds = [];
 		foreach ($cardcrawler as $domElement) {
-			$octgnids[$domElement->getAttribute('id')] = intval($domElement->getAttribute('qty'));
+			$octgnIds[$domElement->getAttribute('id')] = intval($domElement->getAttribute('qty'));
         }
 		// read desc
 		$desccrawler = $crawler->filter('deck > notes');
@@ -214,16 +211,16 @@ class BuilderController extends Controller
 
         $content = [];
 		$faction = null;
-        foreach ($octgnids as $octgnid => $qty) {
+        foreach ($octgnIds as $octgnId => $qty) {
 			$card = $em->getRepository('AppBundle:Card')->findOneBy(array(
-                    'octgnid' => $octgnid
+                    'octgnId' => $octgnId
             ));
             if ($card) {
                 $content[$card->getCode()] = $qty;
             }
 			else {
 				$faction = $faction ?: $em->getRepository('AppBundle:Faction')->findOneBy(array(
-	                    'octgnid' => $octgnid
+	                    'octgnId' => $octgnId
 	            ));
 			}
         }
@@ -245,8 +242,17 @@ class BuilderController extends Controller
 
         /* @var $deck \AppBundle\Entity\Deck */
         $deck = $em->getRepository('AppBundle:Deck')->find($deck_id);
-        if (! $this->getUser() || $this->getUser()->getId() != $deck->getUser()->getId())
-            throw new UnauthorizedHttpException("You don't have access to this deck.");
+        
+        $is_owner = $this->getUser() && $this->getUser()->getId() == $deck->getUser()->getId();
+        if(!$deck->getUser()->getIsShareDecks() && !$is_owner) {
+        	return $this->render(
+        			'AppBundle:Default:error.html.twig',
+        			array(
+        					'pagetitle' => "Error",
+        					'error' => 'You are not allowed to view this deck. To get access, you can ask the deck owner to enable "Share your decks" on their account.'
+        			)
+        	);
+        }
 
         $content = $this->renderView('AppBundle:Export:plain.txt.twig', [
         	"deck" => $deck->getTextExport()
@@ -272,9 +278,18 @@ class BuilderController extends Controller
 
         /* @var $deck \AppBundle\Entity\Deck */
         $deck = $em->getRepository('AppBundle:Deck')->find($deck_id);
-        if (! $this->getUser() || $this->getUser()->getId() != $deck->getUser()->getId())
-            throw new UnauthorizedHttpException("You don't have access to this deck.");
 
+        $is_owner = $this->getUser() && $this->getUser()->getId() == $deck->getUser()->getId();
+        if(!$deck->getUser()->getIsShareDecks() && !$is_owner) {
+        	return $this->render(
+        			'AppBundle:Default:error.html.twig',
+        			array(
+        					'pagetitle' => "Error",
+        					'error' => 'You are not allowed to view this deck. To get access, you can ask the deck owner to enable "Share your decks" on their account.'
+        			)
+        	);
+        }
+        
 		$content = $this->renderView('AppBundle:Export:octgn.xml.twig', [
         	"deck" => $deck->getTextExport()
       	]);
@@ -289,6 +304,39 @@ class BuilderController extends Controller
 
 		$response->setContent($content);
 		return $response;
+    }
+
+    public function cloneAction ($deck_id)
+    {
+        /* @var $em \Doctrine\ORM\EntityManager */
+        $em = $this->getDoctrine()->getManager();
+
+        /* @var $deck \AppBundle\Entity\Deck */
+        $deck = $em->getRepository('AppBundle:Deck')->find($deck_id);
+
+        $is_owner = $this->getUser() && $this->getUser()->getId() == $deck->getUser()->getId();
+        if(!$deck->getUser()->getIsShareDecks() && !$is_owner) {
+            return $this->render(
+                'AppBundle:Default:error.html.twig',
+                array(
+                    'pagetitle' => "Error",
+                    'error' => 'You are not allowed to view this deck. To get access, you can ask the deck owner to enable "Share your decks" on their account.'
+                )
+            );
+        }
+
+        $content = [];
+        foreach ($deck->getSlots() as $slot) {
+            $content[$slot->getCard()->getCode()] = $slot->getQuantity();
+        }
+        return $this->forward('AppBundle:Builder:save',
+            array(
+                'name' => $deck->getName().' (clone)',
+                'faction_code' => $deck->getFaction()->getCode(),
+                'content' => json_encode($content),
+                'deck_id' => $deck->getParent() ? $deck->getParent()->getId() : null
+            ));
+
     }
 
     public function saveAction (Request $request)
@@ -468,6 +516,60 @@ class BuilderController extends Controller
         );
     }
 
+    public function compareAction($deck1_id, $deck2_id, Request $request)
+    {
+    	$entityManager = $this->getDoctrine()->getManager();
+    
+    	/* @var $deck1 \AppBundle\Entity\Deck */
+    	$deck1 = $entityManager->getRepository('AppBundle:Deck')->find($deck1_id);
+    
+    	/* @var $deck2 \AppBundle\Entity\Deck */
+    	$deck2 = $entityManager->getRepository('AppBundle:Deck')->find($deck2_id);
+    
+    	if(!$deck1 || !$deck2) {
+    		return $this->render(
+    				'AppBundle:Default:error.html.twig',
+    				array(
+    						'pagetitle' => "Error",
+    						'error' => 'This deck cannot be found.'
+    				)
+    		);
+    	}
+    	
+    	$is_owner = $this->getUser() && $this->getUser()->getId() == $deck1->getUser()->getId();
+    	if(!$deck1->getUser()->getIsShareDecks() && !$is_owner) {
+    		return $this->render(
+    				'AppBundle:Default:error.html.twig',
+    				array(
+    						'pagetitle' => "Error",
+    						'error' => 'You are not allowed to view this deck. To get access, you can ask the deck owner to enable "Share your decks" on their account.'
+    				)
+    		);
+    	}
+    	
+    	$is_owner = $this->getUser() && $this->getUser()->getId() == $deck2->getUser()->getId();
+    	if(!$deck2->getUser()->getIsShareDecks() && !$is_owner) {
+    		return $this->render(
+    				'AppBundle:Default:error.html.twig',
+    				array(
+    						'pagetitle' => "Error",
+    						'error' => 'You are not allowed to view this deck. To get access, you can ask the deck owner to enable "Share your decks" on their account.'
+    				)
+    		);
+    	}
+    	 
+    	$plotIntersection = $this->get('diff')->getSlotsDiff([$deck1->getSlots()->getPlotDeck(), $deck2->getSlots()->getPlotDeck()]);
+    
+    	$drawIntersection = $this->get('diff')->getSlotsDiff([$deck1->getSlots()->getDrawDeck(), $deck2->getSlots()->getDrawDeck()]);
+    
+    	return $this->render('AppBundle:Compare:deck_compare.html.twig', [
+    			'deck1' => $deck1,
+    			'deck2' => $deck2,
+    			'plot_deck' => $plotIntersection,
+    			'draw_deck' => $drawIntersection,
+    	]);
+    }
+    
     public function listAction ()
     {
         /* @var $user \AppBundle\Entity\User */
@@ -488,7 +590,7 @@ class BuilderController extends Controller
 			foreach($decks as $deck) {
 				$tags[] = $deck['tags'];
 			}
-			$tags = array_unique(explode(' ', join(' ', $tags)));
+			$tags = array_unique($tags);
         	return $this->render('AppBundle:Builder:decks.html.twig',
         			array(
         					'pagetitle' => "My Decks",
@@ -532,32 +634,6 @@ class BuilderController extends Controller
                 		'faction_code' => $decklist->getFaction()->getCode(),
                         'content' => json_encode($content),
                         'decklist_id' => $decklist_id
-                ));
-
-    }
-
-    public function duplicateAction ($deck_id)
-    {
-        /* @var $em \Doctrine\ORM\EntityManager */
-        $em = $this->getDoctrine()->getManager();
-
-        /* @var $deck \AppBundle\Entity\Deck */
-        $deck = $em->getRepository('AppBundle:Deck')->find($deck_id);
-
-        if($this->getUser()->getId() != $deck->getUser()->getId()) {
-            throw new UnauthorizedHttpException("You are not allowed to view this deck.");
-        }
-
-        $content = [];
-        foreach ($deck->getSlots() as $slot) {
-            $content[$slot->getCard()->getCode()] = $slot->getQuantity();
-        }
-        return $this->forward('AppBundle:Builder:save',
-                array(
-                        'name' => $deck->getName().' (copy)',
-                		'faction_code' => $deck->getFaction()->getCode(),
-                        'content' => json_encode($content),
-                        'deck_id' => $deck->getParent() ? $deck->getParent()->getId() : null
                 ));
 
     }

@@ -3,11 +3,7 @@
 namespace AppBundle\Controller;
 
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Serializer\Normalizer\GetSetMethodNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
-use AppBundle\Controller\DefaultController;
-use \Michelf\Markdown;
-use AppBundle\AppBundle;
 use Symfony\Component\HttpFoundation\Request;
 
 class SearchController extends Controller
@@ -71,14 +67,7 @@ class SearchController extends Controller
 
 		$dbh = $this->getDoctrine()->getConnection();
 
-		$list_packs = $this->getDoctrine()->getRepository('AppBundle:Pack')->findBy([], array("dateRelease" => "ASC", "position" => "ASC"));
-		$packs = [];
-		foreach($list_packs as $pack) {
-			$packs[] = array(
-					"name" => $pack->getName(),
-					"code" => $pack->getCode(),
-			);
-		}
+		$packs = $this->get('cards_data')->allsetsdata();
 
 		$cycles = $this->getDoctrine()->getRepository('AppBundle:Cycle')->findBy([], array("position" => "ASC"));
 		$types = $this->getDoctrine()->getRepository('AppBundle:Type')->findBy([], array("name" => "ASC"));
@@ -139,7 +128,9 @@ class SearchController extends Controller
 	public function listAction($pack_code, $view, $sort, $page, Request $request)
 	{
 		$pack = $this->getDoctrine()->getRepository('AppBundle:Pack')->findOneBy(array("code" => $pack_code));
-		if(!$pack) throw $this->createNotFoundException('This pack does not exist');
+		if(!$pack) {
+			throw $this->createNotFoundException('This pack does not exist');
+		}
 
 		$game_name = $this->container->getParameter('game_name');
 		$publisher_name = $this->container->getParameter('publisher_name');

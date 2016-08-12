@@ -4,13 +4,11 @@ namespace AppBundle\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Response;
-use AppBundle\Entity\Deck;
-use AppBundle\Entity\Deckslot;
 use AppBundle\Entity\Decklist;
-use AppBundle\Entity\Decklistslot;
 use Symfony\Component\HttpFoundation\Request;
 use Doctrine\Common\Collections\Criteria;
 use Nelmio\ApiDocBundle\Annotation\ApiDoc;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class ApiController extends Controller
 {
@@ -35,7 +33,7 @@ class ApiController extends Controller
 		$response->setMaxAge($this->container->getParameter('cache_expiration'));
 		$response->headers->add(array('Access-Control-Allow-Origin' => '*'));
 
-		$jsonp = $this->getRequest()->query->get('jsonp');
+		$jsonp = $request->query->get('jsonp');
 
 		$list_packs = $this->getDoctrine()->getRepository('AppBundle:Pack')->findBy(array(), array("dateRelease" => "ASC", "position" => "ASC"));
 
@@ -68,7 +66,7 @@ class ApiController extends Controller
 					"available" => $pack->getDateRelease() ? $pack->getDateRelease()->format('Y-m-d') : '',
 					"known" => intval($real),
 					"total" => $max,
-					"url" => $this->get('router')->generate('cards_list', array('pack_code' => $pack->getCode()), true),
+					"url" => $this->get('router')->generate('cards_list', array('pack_code' => $pack->getCode()), UrlGeneratorInterface::ABSOLUTE_URL),
 			);
 		}
 
@@ -119,7 +117,7 @@ class ApiController extends Controller
 		$response->setMaxAge($this->container->getParameter('cache_expiration'));
 		$response->headers->add(array('Access-Control-Allow-Origin' => '*'));
 
-		$jsonp = $this->getRequest()->query->get('jsonp');
+		$jsonp = $request->query->get('jsonp');
 
 		$card = $this->getDoctrine()->getRepository('AppBundle:Card')->findOneBy(array("code" => $card_code));
 
@@ -176,7 +174,7 @@ class ApiController extends Controller
 		$response->setMaxAge($this->container->getParameter('cache_expiration'));
 		$response->headers->add(array('Access-Control-Allow-Origin' => '*'));
 
-		$jsonp = $this->getRequest()->query->get('jsonp');
+		$jsonp = $request->query->get('jsonp');
 
 		$list_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findBy(array(), array("code" => "ASC"));
 
@@ -231,7 +229,7 @@ class ApiController extends Controller
      *      {
      *          "name"="pack_code",
      *          "dataType"="string",
-     *          "description"="The code of the pack to get the cards from, e.g. 'core'"
+     *          "description"="The code of the pack to get the cards from, e.g. 'Core'"
      *      },
      *      {
      *          "name"="_format",
@@ -250,11 +248,11 @@ class ApiController extends Controller
 		$response->setMaxAge($this->container->getParameter('cache_expiration'));
 		$response->headers->add(array('Access-Control-Allow-Origin' => '*'));
 
-		$jsonp = $this->getRequest()->query->get('jsonp');
+		$jsonp = $request->query->get('jsonp');
 
-		$format = $this->getRequest()->getRequestFormat();
+		$format = $request->getRequestFormat();
 		if($format !== 'json') {
-			$response->setContent($this->getRequest()->getRequestFormat() . ' format not supported. Only json is supported.');
+			$response->setContent($request->getRequestFormat() . ' format not supported. Only json is supported.');
 			return $response;
 		}
 
@@ -273,7 +271,7 @@ class ApiController extends Controller
 				if(empty($last_modified) || $last_modified < $rows[$rowindex]->getDateUpdate()) $last_modified = $rows[$rowindex]->getDateUpdate();
 			}
 			$response->setLastModified($last_modified);
-			if ($response->isNotModified($this->getRequest())) {
+			if ($response->isNotModified($request)) {
 				return $response;
 			}
 			for($rowindex = 0; $rowindex < count($rows); $rowindex++) {
@@ -331,11 +329,11 @@ class ApiController extends Controller
 		$response->setMaxAge($this->container->getParameter('cache_expiration'));
 		$response->headers->add(array('Access-Control-Allow-Origin' => '*'));
 		
-		$jsonp = $this->getRequest()->query->get('jsonp');
+		$jsonp = $request->query->get('jsonp');
 		
-		$format = $this->getRequest()->getRequestFormat();
+		$format = $request->getRequestFormat();
 		if($format !== 'json') {
-			$response->setContent($this->getRequest()->getRequestFormat() . ' format not supported. Only json is supported.');
+			$response->setContent($request->getRequestFormat() . ' format not supported. Only json is supported.');
 			return $response;
 		}
 		
@@ -344,7 +342,7 @@ class ApiController extends Controller
 		if(!$decklist) die();
 		
 		$response->setLastModified($decklist->getDateUpdate());
-		if ($response->isNotModified($this->getRequest())) {
+		if ($response->isNotModified($request)) {
 			return $response;
 		}
 		
@@ -396,11 +394,11 @@ class ApiController extends Controller
 		$response->setMaxAge($this->container->getParameter('cache_expiration'));
 		$response->headers->add(array('Access-Control-Allow-Origin' => '*'));
 		
-		$jsonp = $this->getRequest()->query->get('jsonp');
+		$jsonp = $request->query->get('jsonp');
 		
-		$format = $this->getRequest()->getRequestFormat();
+		$format = $request->getRequestFormat();
 		if($format !== 'json') {
-			$response->setContent($this->getRequest()->getRequestFormat() . ' format not supported. Only json is supported.');
+			$response->setContent($request->getRequestFormat() . ' format not supported. Only json is supported.');
 			return $response;
 		}
 		
@@ -423,7 +421,7 @@ class ApiController extends Controller
 		})->toArray();
 		
 		$response->setLastModified(max($dateUpdates));
-		if ($response->isNotModified($this->getRequest())) {
+		if ($response->isNotModified($request)) {
 			return $response;
 		}
 		

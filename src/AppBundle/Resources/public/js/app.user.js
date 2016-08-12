@@ -100,8 +100,6 @@ user.dropdown = function dropdown(list) {
  * @memberOf user
  */
 user.display_ads = function display_ads() {
-	return;
-
 	// show ads if not donator
 	if(user.data && user.data.donation > 0) return;
 
@@ -111,12 +109,13 @@ user.display_ads = function display_ads() {
 		$(element).show();
 		adsbygoogle.push({});
 	});
-
+/*
 	if($('ins.adsbygoogle').filter(':visible').length === 0) {
 		$('div.ad').each(function (index, element) {
-			$(element).addClass('ad-blocked').html("No ad,<br>no <span class=\"icon icon-credit\"></span>.<br>Like app?<br>Whitelist us<br>or <a href=\""+Routing.generate('donators')+"\">donate</a>.");
+			$(element).addClass('ad-blocked').html("Please whitelist us<br>or <a href=\""+Routing.generate('donators')+"\">donate</a>.");
 		});
 	}
+*/
 }
 
 user.loaded.done(user.update).fail(user.anonymous).always(user.display_ads);

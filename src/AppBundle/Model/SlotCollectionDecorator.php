@@ -149,6 +149,29 @@ class SlotCollectionDecorator implements \AppBundle\Model\SlotCollectionInterfac
 		}
 		return new SlotCollectionDecorator(new ArrayCollection($drawDeck));
 	}
+	
+	public function getCopiesAndDeckLimit()
+	{
+		$copiesAndDeckLimit = [];
+		foreach($this->slots as $slot) {
+			$cardName = $slot->getCard()->getName();
+			if(!key_exists($cardName, $copiesAndDeckLimit)) {
+				$copiesAndDeckLimit[$cardName] = [
+						'copies' => $slot->getQuantity(),
+						'deck_limit' => $slot->getCard()->getDeckLimit(),
+				];
+			} else {
+				$copiesAndDeckLimit[$cardName]['copies'] += $slot->getQuantity();
+				$copiesAndDeckLimit[$cardName]['deck_limit'] = min($slot->getCard()->getDeckLimit(), $copiesAndDeckLimit[$cardName]['deck_limit']);
+			}
+		}
+		return $copiesAndDeckLimit;
+	}
+	
+	public function getSlots()
+	{
+		return $this->slots;
+	}
 
 	public function getContent()
 	{
@@ -159,5 +182,5 @@ class SlotCollectionDecorator implements \AppBundle\Model\SlotCollectionInterfac
 		ksort ( $arr );
 		return $arr;
 	}
-
+	
 }

@@ -6,10 +6,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use AppBundle\Entity\Deck;
-use AppBundle\Entity\Deckslot;
 use AppBundle\Entity\Decklist;
 use AppBundle\Entity\Decklistslot;
 use AppBundle\Entity\Comment;
@@ -17,10 +15,9 @@ use AppBundle\Entity\User;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use AppBundle\Model\DecklistManager;
-use AppBundle\Services\Pagination\Pagination;
-use Symfony\Component\HttpFoundation\JsonResponse;
-use AppBundle\Form\DecklistType;
-use FOS\UserBundle\FOSUserBundle;
+use AppBundle\Services\Pagination;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use AppBundle\Entity\Pack;
 
 class SocialController extends Controller
 {
@@ -32,17 +29,40 @@ class SocialController extends Controller
     {
     	/* @var $em \Doctrine\ORM\EntityManager */
     	$em = $this->getDoctrine()->getManager();
-    
+
+        /* @var $user \AppBundle\Entity\User */
     	$user = $this->getUser();
     	if (! $user) {
     		throw $this->createAccessDeniedException("You must be logged in for this operation.");
     	}
-    
-    	$deck = $em->getRepository('AppBundle:Deck')->find($deck_id);
-    	if (! $deck || $deck->getUser()->getId() != $user->getId()) {
-    		throw $this->createAccessDeniedException("You don't have access to this decklist.");
-    	}
 
+        $deck = $em->getRepository('AppBundle:Deck')->find($deck_id);
+        if (! $deck || $deck->getUser()->getId() != $user->getId()) {
+            throw $this->createAccessDeniedException("You don't have access to this decklist.");
+        }
+
+        $yesterday = (new \DateTime())->modify('-24 hours');
+        if($user->getDateCreation() > $yesterday) {
+            $this->get('session')->getFlashBag()->set('error', "To prevent spam, newly created accounts must wait 24 hours before being allowed to publish a decklist.");
+            return $this->redirect($this->generateUrl('deck_view', [ 'deck_id' => $deck->getId() ]));
+        }
+
+        $query = $em->createQuery("SELECT COUNT(d) FROM AppBundle:Decklist d WHERE d.dateCreation>:date AND d.user=:user");
+        $query->setParameter('date', $yesterday);
+        $query->setParameter('user', $user);
+        $decklistsSinceYesterday = $query->getSingleScalarResult();
+
+        if($decklistsSinceYesterday > $user->getReputation()) {
+            $this->get('session')->getFlashBag()->set('error', "To prevent spam, accounts cannot publish more decklists than their reputation per 24 hours.");
+            return $this->redirect($this->generateUrl('deck_view', [ 'deck_id' => $deck->getId() ]));
+        }
+
+        $lastPack = $deck->getLastPack();
+        if(!$lastPack->getDateRelease() || $lastPack->getDateRelease() > new \DateTime()) {
+        	$this->get('session')->getFlashBag()->set('error', "You cannot publish this deck yet, because it has unreleased cards.");
+        	return $this->redirect($this->generateUrl('deck_view', [ 'deck_id' => $deck->getId() ]));
+        }
+        
     	$problem = $this->get('deck_validation_helper')->findProblem($deck);
     	if ($problem) {
     		$this->get('session')->getFlashBag()->set('error', "This deck cannot be published because it is invalid.");
@@ -82,13 +102,36 @@ class SocialController extends Controller
 	 */
     public function createAction (Request $request)
     {
+        /* @var $em \Doctrine\ORM\EntityManager */
         $em = $this->getDoctrine()->getManager();
+        /* @var $user \AppBundle\Entity\User */
+        $user = $this->getUser();
+
+        $yesterday = (new \DateTime())->modify('-24 hours');
+        if($user->getDateCreation() > $yesterday) {
+            return $this->render('AppBundle:Default:error.html.twig', [
+                'pagetitle' => "Spam prevention",
+                'error' => "To prevent spam, newly created accounts must wait 24 hours before being allowed to publish a decklist.",
+            ]);
+        }
+
+        $query = $em->createQuery("SELECT COUNT(d) FROM AppBundle:Decklist d WHERE d.dateCreation>:date AND d.user=:user");
+        $query->setParameter('date', $yesterday);
+        $query->setParameter('user', $user);
+        $decklistsSinceYesterday = $query->getSingleScalarResult();
+
+        if($decklistsSinceYesterday > $user->getReputation()) {
+            return $this->render('AppBundle:Default:error.html.twig', [
+                'pagetitle' => "Spam prevention",
+                'error' => "To prevent spam, accounts cannot publish more decklists than their reputation per 24 hours.",
+            ]);
+        }
 
         $deck_id = intval(filter_var($request->request->get('deck_id'), FILTER_SANITIZE_NUMBER_INT));
         
         /* @var $deck \AppBundle\Entity\Deck */
         $deck = $this->getDoctrine()->getRepository('AppBundle:Deck')->find($deck_id);
-        if ($this->getUser()->getId() !== $deck->getUser()->getId()) {
+        if ($user->getId() !== $deck->getUser()->getId()) {
         	throw $this->createAccessDeniedException("Access denied to this object.");
         }
         
@@ -433,7 +476,7 @@ class SocialController extends Controller
                         'pagetitle' => $pagetitle,
                         'pagedescription' => "Browse the collection of thousands of premade decks.",
                         'decklists' => $paginator,
-                        'url' => $this->getRequest()->getRequestUri(),
+                        'url' => $request->getRequestUri(),
                         'header' => $header,
                         'type' => $type,
                 		'pages' => $decklist_manager->getClosePages(),
@@ -453,7 +496,10 @@ class SocialController extends Controller
         $response->setMaxAge($this->container->getParameter('cache_expiration'));
 
         $decklist = $this->getDoctrine()->getManager()->getRepository('AppBundle:Decklist')->find($decklist_id);
-        
+        if(!$decklist) {
+            throw $this->createNotFoundException("Decklist not found.");
+        }
+
         $duplicate = $this->getDoctrine()->getManager()->getRepository('AppBundle:Decklist')->findOneBy(['signature' => $decklist->getSignature()], ['dateCreation' => 'ASC']);
         if($duplicate->getDateCreation() >= $decklist->getDateCreation() || $duplicate->getId() === $decklist->getId()) {
         	$duplicate = null;
@@ -607,9 +653,9 @@ class SocialController extends Controller
             $email_data = array(
                 'username' => $user->getUsername(),
                 'decklist_name' => $decklist->getName(),
-                'url' => $this->generateUrl('decklist_detail', array('decklist_id' => $decklist->getId(), 'decklist_name' => $decklist->getNameCanonical()), TRUE) . '#' . $comment->getId(),
+                'url' => $this->generateUrl('decklist_detail', array('decklist_id' => $decklist->getId(), 'decklist_name' => $decklist->getNameCanonical()), UrlGeneratorInterface::ABSOLUTE_URL) . '#' . $comment->getId(),
                 'comment' => $comment_html,
-                'profile' => $this->generateUrl('user_profile_edit', [], TRUE)
+                'profile' => $this->generateUrl('user_profile_edit', [], UrlGeneratorInterface::ABSOLUTE_URL)
             );
             foreach($spool as $email => $view) {
                 $message = \Swift_Message::newInstance()
@@ -875,7 +921,7 @@ class SocialController extends Controller
         $nbpages = min(10, ceil($maxcount / $limit));
         $nextpage = min($nbpages, $currpage + 1);
 
-        $route = $this->getRequest()->get('_route');
+        $route = $request->get('_route');
 
         $pages = [];
         for ($page = 1; $page <= $nbpages; $page ++) {
@@ -892,7 +938,7 @@ class SocialController extends Controller
                 array(
                         'user' => $user,
                         'comments' => $comments,
-                        'url' => $this->getRequest()
+                        'url' => $request
                             ->getRequestUri(),
                         'route' => $route,
                         'pages' => $pages,
@@ -946,7 +992,7 @@ class SocialController extends Controller
         $nbpages = min(10, ceil($maxcount / $limit));
         $nextpage = min($nbpages, $currpage + 1);
 
-        $route = $this->getRequest()->get('_route');
+        $route = $request->get('_route');
 
         $pages = [];
         for ($page = 1; $page <= $nbpages; $page ++) {
@@ -962,7 +1008,7 @@ class SocialController extends Controller
         return $this->render('AppBundle:Default:allcomments.html.twig',
                 array(
                         'comments' => $comments,
-                        'url' => $this->getRequest()
+                        'url' => $request
                             ->getRequestUri(),
                         'route' => $route,
                         'pages' => $pages,
@@ -1014,12 +1060,8 @@ class SocialController extends Controller
                 $categories[] = $category;
             }
         }
-
-        return $this->render('AppBundle:Search:search.html.twig',
-                array(
-                        'pagetitle' => 'Decklist Search',
-                        'url' => $this->getRequest()->getRequestUri(),
-                        'form' => $this->renderView('AppBundle:Search:form.html.twig',
+        
+        $searchForm = $this->renderView('AppBundle:Search:form.html.twig',
                             array(
                                 'factions' => $factions,
                                 'allowed' => $categories,
@@ -1028,9 +1070,20 @@ class SocialController extends Controller
                                 'author' => '',
                                 'name' => '',
                             )
-                        ),
-                ), $response);
+                        );
 
+        return $this->render('AppBundle:Decklist:decklists.html.twig',
+        		array(
+        				'pagetitle' => 'Decklist Search',
+        				'decklists' => null,
+        				'url' => $request->getRequestUri(),
+        				'header' => $searchForm,
+        				'type' => 'find',
+        				'pages' => null,
+        				'prevurl' => null,
+        				'nexturl' => null,
+        		), $response);	
+        
     }
 
     public function donatorsAction (Request $request)

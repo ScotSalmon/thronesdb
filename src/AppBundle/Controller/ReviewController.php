@@ -1,5 +1,7 @@
 <?php
+
 namespace AppBundle\Controller;
+
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 use Symfony\Component\HttpFoundation\Response;
@@ -7,14 +9,11 @@ use AppBundle\Entity\Review;
 use AppBundle\Entity\Card;
 use Doctrine\ORM\EntityManager;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use AppBundle\Entity\Comment;
 use AppBundle\Entity\Reviewcomment;
 use \Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Component\HttpFoundation\JsonResponse;
-
 
 class ReviewController extends Controller
 {
@@ -256,7 +255,7 @@ class ReviewController extends Controller
                         'pagetitle' => $pagetitle,
                         'pagedescription' => "Read the latest user-submitted reviews on the cards.",
                         'reviews' => $reviews,
-                        'url' => $this->getRequest()->getRequestUri(),
+                        'url' => $request->getRequestUri(),
                         'route' => $route,
                         'pages' => $pages,
                         'prevurl' => $currpage == 1 ? null : $this->generateUrl($route, $params + array(
@@ -327,7 +326,7 @@ class ReviewController extends Controller
                         'pagetitle' => $pagetitle,
                         'pagedescription' => "Read the latest user-submitted reviews on the cards.",
                         'reviews' => $reviews,
-                        'url' => $this->getRequest()->getRequestUri(),
+                        'url' => $request->getRequestUri(),
                         'route' => $route,
                         'pages' => $pages,
                         'prevurl' => $currpage == 1 ? null : $this->generateUrl($route, $params + array(

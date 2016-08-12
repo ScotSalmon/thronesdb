@@ -5,7 +5,6 @@ var date_creation,
 	description_md,
 	id,
 	name,
-	slots,
 	tags,
 	faction_code,
 	faction_name,
@@ -17,6 +16,7 @@ var date_creation,
 		too_many_different_plots: "Contains more than one duplicated Plot",
 		too_many_agendas: "Contains more than one Agenda",
 		too_few_cards: "Contains too few cards",
+		too_many_copies: "Contains too many copies of a card (by title)",
 		invalid_cards: "Contains forbidden cards (cards no permitted by Faction or Agenda)",
 		agenda: "Doesn't comply with the Agenda conditions"
 	},
@@ -29,11 +29,10 @@ var date_creation,
  * Templates for the different deck layouts, see deck.get_layout_data
  */
 layouts[1] = _.template('<div class="deck-content"><%= meta %><%= plots %><%= characters %><%= attachments %><%= locations %><%= events %></div>');
-layouts[2] = _.template('<div class="deck-content"><div class="row"><div class="col-sm-6"><%= meta %></div><div class="col-sm-6"><%= plots %></div></div><div class="row"><div class="col-sm-6"><%= characters %></div><div class="col-sm-6"><%= attachments %><%= locations %><%= events %></div></div></div>');
+layouts[2] = _.template('<div class="deck-content"><div class="row"><div class="col-sm-6 col-print-6"><%= meta %></div><div class="col-sm-6 col-print-6"><%= plots %></div></div><div class="row"><div class="col-sm-6 col-print-6"><%= characters %></div><div class="col-sm-6 col-print-6"><%= attachments %><%= locations %><%= events %></div></div></div>');
 layouts[3] = _.template('<div class="deck-content"><div class="row"><div class="col-sm-4"><%= meta %><%= plots %></div><div class="col-sm-4"><%= characters %></div><div class="col-sm-4"><%= attachments %><%= locations %><%= events %></div></div></div>');
 
 /**
- * Called on page load before DOM and data
  * @memberOf deck
  */
 deck.init = function init(data) {
@@ -42,19 +41,25 @@ deck.init = function init(data) {
 	description_md = data.description_md;
 	id = data.id;
 	name = data.name;
-	slots = data.slots;
 	tags = data.tags;
 	faction_code = data.faction_code;
 	faction_name = data.faction_name;
 	unsaved = data.unsaved;
 	user_id = data.user_id;
 	
-	// when app.data has finished, update the card database
-	$(document).on('data.app', deck.on_data_loaded);
+	if(app.data.isLoaded) {
+		deck.set_slots(data.slots);
+	} else {
+		console.log("deck.set_slots put on hold until data.app");
+		$(document).on('data.app', function () { deck.set_slots(data.slots); });
+	}
 }
 
-deck.on_data_loaded = function deck_on_data_loaded()
-{
+/**
+ * Sets the slots of the deck
+ * @memberOf deck
+ */
+deck.set_slots = function set_slots(slots) {
 	app.data.cards.update({}, {
 		indeck: 0
 	});
@@ -279,8 +284,14 @@ deck.get_layout_data_one_section = function get_layout_data_one_section(sortKey,
 	if(cards.length) {
 		$(header_tpl({code: sortValue, name:cards[0][displayLabel], quantity: deck.get_nb_cards(cards)})).appendTo(section);
 		cards.forEach(function (card) {
-			$('<div>').addClass(deck.can_include_card(card) ? '' : 'invalid-card').append($(card_line_tpl({card:card}))).prepend(card.indeck+'x ').appendTo(section);
-		})
+			var $div = $('<div>').addClass(deck.can_include_card(card) ? '' : 'invalid-card');
+			$div.append($(card_line_tpl({card:card})));
+			$div.prepend(card.indeck+'x ');
+			if(app.data.cards.find({'name': card.name}).length > 1) {
+				$div.append(' ('+card.pack_code+')');
+			}
+			$div.appendTo(section);
+		});
 	}
 	return section;
 }
@@ -344,6 +355,26 @@ deck.get_export = function get_export(format) {
 /**
  * @memberOf deck
  */
+deck.get_copies_and_deck_limit = function get_copies_and_deck_limit() {
+	var copies_and_deck_limit = {};
+	deck.get_draw_deck().forEach(function (card) {
+		var value = copies_and_deck_limit[card.name];
+		if(!value) {
+			copies_and_deck_limit[card.name] = {
+					nb_copies: card.indeck,
+					deck_limit: card.deck_limit
+			};
+		} else {
+			value.nb_copies += card.indeck;
+			value.deck_limit = Math.min(card.deck_limit, value.deck_limit);
+		}
+	})
+	return copies_and_deck_limit;
+}
+
+/**
+ * @memberOf deck
+ */
 deck.get_problem = function get_problem() {
 	// exactly 7 plots
 	if(deck.get_plot_deck_size() > 7) {
@@ -368,11 +399,16 @@ deck.get_problem = function get_problem() {
 		return 'too_few_cards';
 	}
 
+	// too many copies of one card
+	if(_.findKey(deck.get_copies_and_deck_limit(), function(value) {
+	    return value.nb_copies > value.deck_limit;
+	}) != null) return 'too_many_copies';
+
 	// no invalid card
 	if(deck.get_invalid_cards().length > 0) {
 		return 'invalid_cards';
 	}
-
+	
 	// the condition(s) of the agenda must be fulfilled
 	var agenda = deck.get_agenda();
 	if(!agenda) return;
@@ -412,7 +448,7 @@ deck.get_minor_faction_code = function get_minor_faction_code() {
 		'01199': 'greyjoy',
 		'01200': 'lannister',
 		'01201': 'martell',
-		'01202': 'nightswatch',
+		'01202': 'thenightswatch',
 		'01203': 'stark',
 		'01204': 'targaryen',
 		'01205': 'tyrell'

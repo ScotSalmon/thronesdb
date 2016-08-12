@@ -22,6 +22,12 @@
 <small title="User Reputation">{{ user.reputation }}</small>
 {% endmacro %}
 
+{% macro username_colorless(user) %}
+<a href="{{ path('user_profile_public', {user_id:user.id,user_name:user.username|e('url')}) }}" class="username">{{ user.username }}</a>
+{% if user.donation > 0 %}<span class="fa fa-gift donator" title="ThronesDB Gracious Donator"></span>{% endif %}
+<small title="User Reputation">{{ user.reputation }}</small>
+{% endmacro %}
+
 {% macro decklist_social_icons(decklist) %}
 <span class="social-icons">
 	<a id="social-icon-like" href="#" class="social-icon-like" data-toggle="tooltip" data-placement="bottom" title="Like">
@@ -37,4 +43,8 @@
 		<span class="fa fa-code-fork"></span> <span class="num">{{ decklist.version }}</span>
 	</a>
 </span>
+{% endmacro %}
+
+{% macro slot_with_icons(slot) %}
+{{ slot.quantity }}x <span class="icon icon-{{ slot.card.type.code }} fg-{{ slot.card.faction.code }}"></span> <a href="{{ path('cards_zoom', {card_code: slot.card.code }) }}" class="card card-tip" data-code="{{ slot.card.code }}">{{ slot.card.name }}</a>
 {% endmacro %}

@@ -4,6 +4,12 @@ services:
         class: AppBundle\Listener\CoreExceptionListener
         tags:
             - { name: kernel.event_listener, event: kernel.exception, method: onCoreException, priority: 1000 }
+            
+    # subdomain listener
+    locale_prefix_listener:
+       class: AppBundle\Listener\LocalePrefixListener
+       tags:
+           - { name: kernel.event_listener, event: kernel.request, method: onKernelRequest }
 
     decks:
         class: AppBundle\Services\Decks
@@ -25,7 +31,7 @@ services:
         arguments: ["@doctrine", "@request_stack", "@router", "@templating.helper.assets", "%kernel.root_dir%"]
     decklist_manager:
         class: AppBundle\Model\DecklistManager
-        scope: prototype
+        shared: false
         arguments: ["@doctrine.orm.entity_manager", "@request_stack", "@router", "@logger"]
     decklist_factory:
         class: AppBundle\Model\DecklistFactory

@@ -2,9 +2,21 @@
 
 namespace AppBundle\Entity;
 
-class Faction
+class Faction implements \Serializable
 {
-
+	public function serialize() {
+		return [
+				'code' => $this->code,
+				'name' => $this->name,
+				'is_primary' => $this->isPrimary,
+				'octgn_id' => $this->octgnId
+		];
+	}
+	
+	public function unserialize($serialized) {
+		throw new \Exception("unserialize() method unsupported");
+	}
+	
     /**
      * @var integer
      */
@@ -23,12 +35,12 @@ class Faction
     /**
      * @var boolean
      */
-    private $is_primary;
+    private $isPrimary;
 
     /**
      * @var string
      */
-    private $octgnid;
+    private $octgnId;
 
     /**
      * @var \Doctrine\Common\Collections\Collection
@@ -110,7 +122,7 @@ class Faction
      */
     public function setIsPrimary($isPrimary)
     {
-        $this->is_primary = $isPrimary;
+        $this->isPrimary = $isPrimary;
 
         return $this;
     }
@@ -122,31 +134,31 @@ class Faction
      */
     public function getIsPrimary()
     {
-        return $this->is_primary;
+        return $this->isPrimary;
     }
 
     /**
-     * Set octgnid
+     * Set octgnId
      *
-     * @param string $octgnid
+     * @param string $octgnId
      *
      * @return Faction
      */
-    public function setOctgnid($octgnid)
+    public function setOctgnId($octgnId)
     {
-        $this->octgnid = $octgnid;
+        $this->octgnId = $octgnId;
 
         return $this;
     }
 
     /**
-     * Get octgnid
+     * Get octgnId
      *
      * @return string
      */
-    public function getOctgnid()
+    public function getOctgnId()
     {
-        return $this->octgnid;
+        return $this->octgnId;
     }
 
     /**

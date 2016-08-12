@@ -7,6 +7,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Doctrine\Bundle\DoctrineBundle\Registry;
 use Symfony\Bundle\FrameworkBundle\Routing\Router;
 use Symfony\Bundle\FrameworkBundle\Templating\Helper\AssetsHelper;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /*
  *
@@ -36,7 +37,7 @@ class CardsData
 			'[lannister]' => '<span class="icon-lannister"></span>',
 			'[martell]' => '<span class="icon-martell"></span>',
 			'[military]' => '<span class="icon-military"></span>',
-			'[nightswatch]' => '<span class="icon-nightswatch"></span>',
+			'[thenightswatch]' => '<span class="icon-thenightswatch"></span>',
 			'[power]' => '<span class="icon-power"></span>',
 			'[stark]' => '<span class="icon-stark"></span>',
 			'[targaryen]' => '<span class="icon-targaryen"></span>',
@@ -59,20 +60,13 @@ class CardsData
 		$lines = [];
 		/* @var $cycle \AppBundle\Entity\Cycle */
 		foreach($list_cycles as $cycle) {
-			if(!$cycle->getIsBox()) {
-				$lines[] = array(
-						"label" => $cycle->getName(),
-						"available" => true,
-						"url" => $this->router->generate('cards_cycle', array('cycle_code' => $cycle->getCode()), true),
-				);
-			}
 			$packs = $cycle->getPacks();
 			/* @var $pack \AppBundle\Entity\Pack */
 			foreach($packs as $pack) {
 				$known = count($pack->getCards());
 				$max = $pack->getSize();
 
-				if($cycle->getIsBox()) {
+				if($cycle->getSize() === 1) {
 					$label = $pack->getName();
 				} else {
 					$label = $pack->getPosition() . '. ' . $pack->getName();
@@ -82,9 +76,10 @@ class CardsData
 				}
 
 				$lines[] = array(
+						"code" => $pack->getCode(),
 						"label" => $label,
 						"available" => $pack->getDateRelease() ? true : false,
-						"url" => $this->router->generate('cards_list', array('pack_code' => $pack->getCode()), true),
+						"url" => $this->router->generate('cards_list', array('pack_code' => $pack->getCode()), UrlGeneratorInterface::ABSOLUTE_URL),
 				);
 			}
 		}
@@ -93,7 +88,7 @@ class CardsData
 
 	public function getPrimaryFactions()
 	{
-		$factions = $this->doctrine->getRepository('AppBundle:Faction')->findBy(array("is_primary" => TRUE), array("code" => "ASC"));
+		$factions = $this->doctrine->getRepository('AppBundle:Faction')->findBy(array("isPrimary" => TRUE), array("code" => "ASC"));
 		return $factions;
 	}
 
@@ -386,7 +381,7 @@ class CardsData
 	    	$cardinfo[$fieldName] = $value;
 	    }
 
-		$cardinfo['url'] = $this->router->generate('cards_zoom', array('card_code' => $card->getCode()), true);
+		$cardinfo['url'] = $this->router->generate('cards_zoom', array('card_code' => $card->getCode()), UrlGeneratorInterface::ABSOLUTE_URL);
 		$imageurl = $this->assets_helper->getUrl('bundles/cards/'.$card->getCode().'.png');
 		$imagepath= $this->rootDir . '/../web' . preg_replace('/\?.*/', '', $imageurl);
 		if(file_exists($imagepath)) {

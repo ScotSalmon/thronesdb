@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" sizes="120x120" href="/icon-120.png" />
     {% if pagedescription is defined %}<meta name="description" content="{{ pagedescription }}">{% endif %}
 
-    <link href='http://fonts.googleapis.com/css?family=Amiri:400,400italic,700,700italic|Julius+Sans+One|Open+Sans:400,400italic,700,700italic|Open+Sans+Condensed:300' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Amiri:400,400italic,700,700italic|Julius+Sans+One|Open+Sans:400,400italic,700,700italic|Open+Sans+Condensed:300' rel='stylesheet' type='text/css'>
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.4.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.1.1/jquery.qtip.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-markdown/2.9.0/css/bootstrap-markdown.min.css">
@@ -60,6 +60,7 @@
             {#
             <li class="hidden-sm"><a href="{{ path('card_reviews_list') }}">Reviews</a></li>
             #}
+            <li><a href="{{ path('rules') }}">Rules</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
             <li class="dropdown hidden-xs hidden-lg">
@@ -113,7 +114,7 @@
     </p>
 
     <p>
-    You may contribute by giving money on <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=4EFH86M88SQAC">Paypal (€)</a> or <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=FXEPSXHMWBU9Q">Paypal ($)</a>.
+    You may contribute by giving money on <a href="https://paypal.me/alsciende">Paypal</a>.
     </p>
 
     <p>
@@ -159,12 +160,13 @@
 
 	{% if app.environment == 'prod' %}
 		<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-		{% include 'AppBundle::google-analytics.html.twig' %}
+		{% include 'AppBundle:Default:google-analytics.html.twig' %}
 	{% endif %}
 
 	{% javascripts filter="?jsqueeze" output="js/app.js"
 		'@AppBundle/Resources/public/js/bootstrap.js'
 		'@AppBundle/Resources/public/js/fdb-all.min.js'
+		'@AppBundle/Resources/public/js/jquery.toc.min.js'
 		'@AppBundle/Resources/public/js/app.data.js'
 		'@AppBundle/Resources/public/js/app.format.js'
 		'@AppBundle/Resources/public/js/app.tip.js'
